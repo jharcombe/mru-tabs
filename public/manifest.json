@@ -23,5 +23,5 @@
       "description": "Select next tab in queue"
     }
   },
-  "permissions": ["tabs"]
+  "permissions": ["storage", "tabs"]
 }
