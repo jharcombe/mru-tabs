@@ -27,11 +27,9 @@ async function setup() {
 }
 
 chrome.runtime.onStartup.addListener(() => {
-  console.log('onStartup');
   setup();
 });
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('onInstalled');
   setup();
 });
 
@@ -151,7 +149,7 @@ chrome.windows.onRemoved.addListener((winId) =>
   chrome.storage.local.get(Key.windows, (windows_) => {
     const windows = windows_[Key.windows];
 
-    windows.delete(winId);
+    delete windows[winId];
 
     chrome.storage.local.set(windows_);
   })
