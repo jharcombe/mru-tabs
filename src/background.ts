@@ -1,16 +1,18 @@
 'use strict';
 
+import { startHeartbeat } from './heartbeat';
+
 enum Key {
   windows = 'mru-tabs_windows',
 }
 
+let windows: any = {};
+
 let done_setup = false;
 async function setup() {
-  console.log('setup called');
   if (done_setup) return;
   done_setup = true;
 
-  const windows = {};
   chrome.tabs.query({}, async (tabs) => {
     tabs.forEach((tab) => {
       const tabs = windows[tab.windowId] ?? [];
@@ -33,124 +35,69 @@ chrome.runtime.onInstalled.addListener(() => {
   setup();
 });
 
+startHeartbeat();
+
 // shortcuts
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-    const tabs = windows[tab.windowId];
+  const tabs = windows[tab.windowId];
 
-    var nextTab: number;
-    switch (command) {
-      case 'nextTab':
-        nextTab = tabs[1];
-        break;
-      case 'prevTab':
-        // TODO: handle multi key presses
-        break;
-      default:
-        return;
-    }
+  var nextTab: number;
+  switch (command) {
+    case 'nextTab':
+      nextTab = tabs[1];
+      break;
+    case 'prevTab':
+      // TODO: handle multi key presses
+      break;
+    default:
+      return;
+  }
 
-    // nextTab should never be undefined but you never know
-    if (typeof nextTab !== 'undefined') {
-      chrome.tabs.update(nextTab, { active: true });
-    }
-  });
+  // nextTab should never be undefined but you never know
+  if (typeof nextTab !== 'undefined') {
+    chrome.tabs.update(nextTab, { active: true });
+  }
 });
 
 // tabs
 
-chrome.tabs.onCreated.addListener((tab) =>
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    windows[tab.windowId].push(tab.id);
-
-    chrome.storage.local.set(windows_);
-  })
-);
+chrome.tabs.onCreated.addListener((tab) => windows[tab.windowId].push(tab.id));
 
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    const tabs = windows[removeInfo.windowId];
-    tabs.splice(tabs.indexOf(tabId), 1);
-
-    chrome.storage.local.set(windows_);
-  });
+  const tabs = windows[removeInfo.windowId];
+  tabs.splice(tabs.indexOf(tabId), 1);
 });
 
 chrome.tabs.onActivated.addListener((tab) => {
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    const tabs = windows[tab.windowId];
-    tabs.splice(tabs.indexOf(tab.tabId), 1);
-    tabs.unshift(tab.tabId);
-
-    chrome.storage.local.set(windows_);
-  });
+  const tabs = windows[tab.windowId];
+  tabs.splice(tabs.indexOf(tab.tabId), 1);
+  tabs.unshift(tab.tabId);
 });
 
 chrome.tabs.onAttached.addListener((tabId, attachInfo) =>
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    windows[attachInfo.newWindowId].push(tabId);
-
-    chrome.storage.local.set(windows_);
-  })
+  windows[attachInfo.newWindowId].push(tabId)
 );
 
 chrome.tabs.onDetached.addListener((tabId, detachInfo) => {
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    const tabs = windows[detachInfo.oldWindowId];
-    tabs.splice(tabs.indexOf(tabId), 1);
-
-    chrome.storage.local.set(windows_);
-  });
+  const tabs = windows[detachInfo.oldWindowId];
+  tabs.splice(tabs.indexOf(tabId), 1);
 });
 
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    for (const [_window, tabs] of windows.entries()) {
-      const index = tabs.indexOf(removedTabId);
-      if (index != -1) {
-        tabs[index] = addedTabId;
-        break;
-      }
+  for (const [_window, tabs] of windows.entries()) {
+    const index = tabs.indexOf(removedTabId);
+    if (index != -1) {
+      tabs[index] = addedTabId;
+      break;
     }
-
-    chrome.storage.local.set(windows_);
-  });
+  }
 });
 
 // chrome.tabs.onUpdated.addListener((tab) => console.log('Updated', tab));
 
 // windows
 
-chrome.windows.onCreated.addListener((win) =>
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
+chrome.windows.onCreated.addListener((win) => (windows[win.id] = []));
 
-    windows[win.id] = [];
-
-    chrome.storage.local.set(windows_);
-  })
-);
-
-chrome.windows.onRemoved.addListener((winId) =>
-  chrome.storage.local.get(Key.windows, (windows_) => {
-    const windows = windows_[Key.windows];
-
-    delete windows[winId];
-
-    chrome.storage.local.set(windows_);
-  })
-);
+chrome.windows.onRemoved.addListener((winId) => delete windows[winId]);
